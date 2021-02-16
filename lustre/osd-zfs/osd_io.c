@@ -342,7 +342,7 @@ static ssize_t osd_write(const struct lu_env *env, struct dt_object *dt,
 		osd_write_llog_header(obj, buf, pos, oh);
 	} else {
 		osd_dmu_write(osd, obj->oo_dn, offset, (uint64_t)buf->lb_len,
-			      buf->lb_buf, oh->ot_tx);
+			      buf->lb_buf, oh->ot_tx, 0);
 	}
 	write_lock(&obj->oo_attr_lock);
 	if (obj->oo_attr.la_size < offset + buf->lb_len) {
@@ -991,8 +991,8 @@ static int osd_write_commit(const struct lu_env *env, struct dt_object *dt,
 	 *        -> wait for the dbuf state to change
 	 * Thread 2:
 	 * osd_write_commit()
-	 *  -> dmu_assign_arcbuf()
-	 *   -> dbuf_assign_arcbuf(), set dbuf state to DB_FILL
+	 *  -> osd_dmu_assign_arcbuf()
+	 *   -> osd_dbuf_assign_arcbuf(), set dbuf state to DB_FILL
 	 *    -> dbuf_dirty()
 	 *     -> try to hold the read lock of dnode_t::dn_struct_rwlock
 	 *
@@ -1029,7 +1029,7 @@ static int osd_write_commit(const struct lu_env *env, struct dt_object *dt,
 		if (lnb[i].lnb_page->mapping == (void *)obj) {
 			osd_dmu_write(osd, obj->oo_dn, lnb[i].lnb_file_offset,
 				      lnb[i].lnb_len, kmap(lnb[i].lnb_page) +
-				      lnb[i].lnb_page_offset, oh->ot_tx);
+				      lnb[i].lnb_page_offset, oh->ot_tx, 0);
 			kunmap(lnb[i].lnb_page);
 			iosize += lnb[i].lnb_len;
 			abufsz = lnb[i].lnb_len; /* to drop cache below */
@@ -1037,7 +1037,7 @@ static int osd_write_commit(const struct lu_env *env, struct dt_object *dt,
 			int j, apages;
 			LASSERT(((unsigned long)lnb[i].lnb_data & 1) == 0);
 			/* buffer loaned for zerocopy, try to use it.
-			 * notice that dmu_assign_arcbuf() is smart
+			 * notice that osd_dmu_assign_arcbuf() is smart
 			 * enough to recognize changed blocksize
 			 * in this case it fallbacks to dmu_write() */
 			abufsz = arc_buf_size(lnb[i].lnb_data);
@@ -1048,9 +1048,9 @@ static int osd_write_commit(const struct lu_env *env, struct dt_object *dt,
 			 * to prevent access in osd_bufs_put() */
 			for (j = 0; j < apages; j++)
 				lnb[i + j].lnb_page = NULL;
-			dmu_assign_arcbuf(&obj->oo_dn->dn_bonus->db,
-					  lnb[i].lnb_file_offset,
-					  lnb[i].lnb_data, oh->ot_tx);
+			osd_dmu_assign_arcbuf(osd, &obj->oo_dn->dn_bonus->db,
+					      lnb[i].lnb_file_offset,
+					      lnb[i].lnb_data, oh->ot_tx, 0);
 			/* drop the reference, otherwise osd_put_bufs()
 			 * will be releasing it - bad! */
 			lnb[i].lnb_data = NULL;
@@ -1066,7 +1066,7 @@ static int osd_write_commit(const struct lu_env *env, struct dt_object *dt,
 			continue;
 
 		/* we have to mark dbufs for eviction here because
-		 * dmu_assign_arcbuf() may create a new dbuf for
+		 * osd_dmu_assign_arcbuf() may create a new dbuf for
 		 * loaned abuf */
 		osd_evict_dbufs_after_write(obj, lnb[i].lnb_file_offset,
 					    abufsz);
