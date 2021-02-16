@@ -914,4 +914,22 @@ AC_DEFUN([LZ_ZFS_KABI_SERIAL], [
 		AC_DEFINE(HAVE_ZFS_REFCOUNT_HEADER, 1,
 			[Have zfs_refcount.h])
 	])
+	dnl #
+	dnl # ZFS 2.3 check for direct IO interfaces.
+	dnl #
+	LB_CHECK_COMPILE([if ZFS has direct IO interfaces],
+	dmu_direct_io, [
+		#include <sys/dmu.h>
+	],[
+		dnode_t *dn = NULL;
+		dmu_tx_t *tx = NULL;
+		uint32_t flags = DMU_DIRECTIO;
+		struct arc_buf *buf = NULL;
+		dmu_write_by_dnode_flags(dn, 0, 0, NULL, tx, flags);
+		dmu_read_by_dnode(dn, 0, 0, NULL, flags);
+		dmu_assign_arcbuf_by_dnode(dn, 0, buf, tx, flags);
+	],[
+		AC_DEFINE(HAVE_DMU_DIRECT, 1,
+			[Have direct IO interfaces])
+	])
 ])

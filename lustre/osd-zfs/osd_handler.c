@@ -839,6 +839,15 @@ static void osd_dnodesize_changed_cb(void *arg, uint64_t newval)
 	osd->od_dnsize = newval;
 }
 
+#ifdef HAVE_DMU_DIRECT
+static void osd_direct_changed_cb(void *arg, uint64_t newval)
+{
+	struct osd_device *osd = arg;
+
+	osd->od_direct = newval;
+}
+#endif
+
 /*
  * This function unregisters all registered callbacks.  It's harmless to
  * unregister callbacks that were never registered so it is used to safely
@@ -856,6 +865,10 @@ static void osd_objset_unregister_callbacks(struct osd_device *o)
 				   osd_readonly_changed_cb, o);
 	(void) dsl_prop_unregister(ds, zfs_prop_to_name(ZFS_PROP_DNODESIZE),
 				   osd_dnodesize_changed_cb, o);
+#ifdef HAVE_DMU_DIRECT
+	(void) dsl_prop_unregister(ds, zfs_prop_to_name(ZFS_PROP_DIRECT),
+				   osd_direct_changed_cb, o);
+#endif
 
 	if (o->arc_prune_cb != NULL) {
 		arc_remove_prune_callback(o->arc_prune_cb);
@@ -896,6 +909,13 @@ static int osd_objset_register_callbacks(struct osd_device *o)
 				osd_dnodesize_changed_cb, o);
 	if (rc)
 		GOTO(err, rc);
+
+#ifdef HAVE_DMU_DIRECT
+	rc = -dsl_prop_register(ds, zfs_prop_to_name(ZFS_PROP_DIRECT),
+				osd_direct_changed_cb, o);
+	if (rc)
+		GOTO(err, rc);
+#endif
 
 	o->arc_prune_cb = arc_add_prune_callback(arc_prune_func, o);
 err:

@@ -350,6 +350,7 @@ struct osd_device {
 				 od_posix_acl:1,
 				 od_nonrotational:1,
 				 od_sync_on_lseek:1;
+	unsigned int		 od_direct;
 	unsigned int		 od_dnsize;
 	int			 od_index_backup_stop;
 
@@ -987,20 +988,67 @@ static inline void osd_tx_hold_write(dmu_tx_t *tx, uint64_t oid,
 	dmu_tx_hold_write(tx, oid, off, len);
 }
 
+#if defined(HAVE_DMU_DIRECT)
+static inline uint32_t osd_dmu_direct_flags(struct osd_device *osd,
+					    uint32_t flags)
+{
+	if (osd->od_direct == ZFS_DIRECT_ALWAYS)
+		flags |= DMU_DIRECTIO;
+	else if (osd->od_direct == ZFS_DIRECT_DISABLED)
+		flags &= ~DMU_DIRECTIO;
+
+	return flags;
+}
+#endif
+
 static inline void osd_dmu_write(struct osd_device *osd, dnode_t *dn,
 				 uint64_t offset, uint64_t size,
-				 const char *buf, dmu_tx_t *tx)
+				 const char *buf, dmu_tx_t *tx, uint32_t flags)
 {
 	LASSERT(dn);
+#if defined(HAVE_DMU_DIRECT)
+	dmu_write_by_dnode_flags(dn, offset, size, buf, tx,
+				 osd_dmu_direct_flags(osd, flags));
+#elif defined(HAVE_DMU_WRITE_BY_DNODE)
 	dmu_write_by_dnode(dn, offset, size, buf, tx);
+#else
+	dmu_write(osd->od_os, dn->dn_object, offset, size, buf, tx);
+#endif
 }
 
 static inline int osd_dmu_read(struct osd_device *osd, dnode_t *dn,
 			       uint64_t offset, uint64_t size,
-			       char *buf, int flags)
+			       char *buf, uint32_t flags)
 {
 	LASSERT(dn);
+#if defined(HAVE_DMU_DIRECT)
+	return -dmu_read_by_dnode(dn, offset, size, buf,
+				  osd_dmu_direct_flags(osd, flags));
+#elif defined(HAVE_DMU_READ_BY_DNODE)
 	return -dmu_read_by_dnode(dn, offset, size, buf, flags);
+#else
+	return -dmu_read(osd->od_os, dn->dn_object, offset, size, buf, flags);
+#endif
+}
+
+static inline int osd_dmu_assign_arcbuf(struct osd_device *osd,
+					dmu_buf_t *handle, uint64_t offset,
+					arc_buf_t *buf, dmu_tx_t *tx,
+					uint32_t flags)
+{
+#if defined(HAVE_DMU_DIRECT)
+	dmu_buf_impl_t *dbuf = (dmu_buf_impl_t *)handle;
+	int err;
+
+	DB_DNODE_ENTER(dbuf);
+	err = -dmu_assign_arcbuf_by_dnode(DB_DNODE(dbuf), offset, buf, tx,
+					  osd_dmu_direct_flags(osd, flags));
+	DB_DNODE_EXIT(dbuf);
+
+	return err;
+#else
+	return -dmu_assign_arcbuf(handle, offset, buf, tx);
+#endif
 }
 
 #ifdef HAVE_DMU_OBJSET_OWN_6ARG
