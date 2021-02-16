@@ -767,6 +767,24 @@ your distribution.
 			AC_DEFINE(HAVE_DB_DIRTY_RECORDS_LIST, 1,
 				[Have db_dirty_records list_t])
 		])
+		dnl #
+		dnl # ZFS 2.1 check for direct IO interfaces.
+		dnl #
+		LB_CHECK_COMPILE([if ZFS has direct IO interfaces],
+		dmu_direct_io, [
+			#include <sys/dmu.h>
+		],[
+			dnode_t *dn = NULL;
+			dmu_tx_t *tx = NULL;
+			uint32_t flags = DMU_DIRECTIO;
+			struct arc_buf *buf = NULL;
+			dmu_write_by_dnode_flags(dn, 0, 0, NULL, tx, flags);
+			dmu_read_by_dnode(dn, 0, 0, NULL, flags);
+			dmu_assign_arcbuf_by_dnode(dn, 0, buf, tx, flags);
+		],[
+			AC_DEFINE(HAVE_DMU_DIRECT, 1,
+				[Have direct IO interfaces])
+		])
 	])
 
 	AS_IF([test "x$enable_zfs" = xyes], [
