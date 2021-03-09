@@ -925,9 +925,10 @@ AC_DEFUN([LZ_ZFS_KABI_SERIAL], [
 		dmu_tx_t *tx = NULL;
 		uint32_t flags = DMU_DIRECTIO;
 		struct arc_buf *buf = NULL;
+		struct page **pages = NULL;
 		dmu_write_by_dnode_flags(dn, 0, 0, NULL, tx, flags);
 		dmu_read_by_dnode(dn, 0, 0, NULL, flags);
-		dmu_assign_arcbuf_by_dnode(dn, 0, buf, tx, flags);
+		dmu_read_into_pages_direct(dn, 0, 0, pages);
 	],[
 		AC_DEFINE(HAVE_DMU_DIRECT, 1,
 			[Have direct IO interfaces])

@@ -221,6 +221,9 @@ extern const struct dt_index_operations osd_otable_ops;
 /* max.number of regular attributes the callers may ask for */
 # define OSD_MAX_IN_BULK (sizeof(struct osa_attr)/sizeof(uint64_t))
 
+/* max number of pages for O_DIRECT read */
+# define OSD_MAX_DIO_PAGES (DMU_MAX_ACCESS >> PAGE_SHIFT)
+
 struct osd_thread_info {
 	const struct lu_env	*oti_env;
 
@@ -270,6 +273,9 @@ struct osd_thread_info {
 	char			*oti_seq_name;
 	char			*oti_dir_name;
 	uint64_t		oti_lastid_oid;
+
+	struct page	       **oti_dio_pages;
+	int		       oti_dio_pages_used;
 };
 
 extern struct lu_context_key osd_key;
@@ -992,12 +998,31 @@ static inline void osd_tx_hold_write(dmu_tx_t *tx, uint64_t oid,
 static inline uint32_t osd_dmu_direct_flags(struct osd_device *osd,
 					    uint32_t flags)
 {
+	/*
+	 * We have already been marked to use O_DIRECT.
+	 */
+	if (flags & DMU_DIRECTIO)
+		return flags;
+
 	if (osd->od_direct == ZFS_DIRECT_ALWAYS)
 		flags |= DMU_DIRECTIO;
 	else if (osd->od_direct == ZFS_DIRECT_DISABLED)
 		flags &= ~DMU_DIRECTIO;
 
 	return flags;
+}
+
+static inline boolean_t osd_dmu_has_direct(struct osd_device *osd)
+{
+	if (osd->od_direct == ZFS_DIRECT_ALWAYS)
+		return (B_TRUE);
+
+	return (B_FALSE);
+}
+#else
+static inline boolean_t osd_dmu_has_direct(struct osd_device *osd)
+{
+	return (B_FALSE);
 }
 #endif
 
@@ -1028,26 +1053,6 @@ static inline int osd_dmu_read(struct osd_device *osd, dnode_t *dn,
 	return -dmu_read_by_dnode(dn, offset, size, buf, flags);
 #else
 	return -dmu_read(osd->od_os, dn->dn_object, offset, size, buf, flags);
-#endif
-}
-
-static inline int osd_dmu_assign_arcbuf(struct osd_device *osd,
-					dmu_buf_t *handle, uint64_t offset,
-					arc_buf_t *buf, dmu_tx_t *tx,
-					uint32_t flags)
-{
-#if defined(HAVE_DMU_DIRECT)
-	dmu_buf_impl_t *dbuf = (dmu_buf_impl_t *)handle;
-	int err;
-
-	DB_DNODE_ENTER(dbuf);
-	err = -dmu_assign_arcbuf_by_dnode(DB_DNODE(dbuf), offset, buf, tx,
-					  osd_dmu_direct_flags(osd, flags));
-	DB_DNODE_EXIT(dbuf);
-
-	return err;
-#else
-	return -dmu_assign_arcbuf(handle, offset, buf, tx);
 #endif
 }
 

@@ -765,6 +765,7 @@ static void osd_key_fini(const struct lu_context *ctx,
 		info->oti_ins_cache = NULL;
 		info->oti_ins_cache_size = 0;
 	}
+
 	lu_buf_free(&info->oti_xattr_lbuf);
 	OBD_FREE_PTR(info);
 }
