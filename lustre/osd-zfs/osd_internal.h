@@ -1029,7 +1029,21 @@ static inline boolean_t osd_dmu_has_direct(struct osd_device *osd)
 
 	return (B_FALSE);
 }
-#endif
+#else
+static inline boolean_t osd_dmu_has_direct(struct osd_device *osd)
+{
+	return (B_FALSE);
+}
+
+static inline int dmu_read_into_pages_direct(dnode_t *dn, loff_t off,
+					     ssize_t size, struct page **pages)
+{
+	return (EINVAL);
+}
+
+#undef DMU_DIRECTIO
+#define DMU_DIRECTIO 0
+#endif /* HAVE_DMU_DIRECT */
 
 static inline void osd_dmu_write(struct osd_device *osd, dnode_t *dn,
 				 uint64_t offset, uint64_t size,
