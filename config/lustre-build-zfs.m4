@@ -853,6 +853,22 @@ your distribution.
 		])
 		EXTRA_KCFLAGS=$old_EXTRA_KCFLAGS
 		dnl #
+		dnl # ZFS 2.2.3 requires boolean_t to be passed to check
+		dnl # for an error in dmu_buf_will_fill() and to respond to
+		dnl # an error in dmu_buf_fill_done()
+		dnl #
+		LB_CHECK_COMPILE([if ZFS dmu_buf_will_fill requries boolean arg],
+		zfs_dmu_buf_will_fill_boolean_t, [
+			#include <sys/dbuf.h>
+		], [
+			dmu_buf_t *db = NULL;
+			dmu_tx_t *tx = NULL;
+			dmu_buf_will_fill(db, tx, B_FALSE);
+		], [
+			AC_DEFINE(HAVE_DMU_BUF_WILL_FILL_3ARG, 1,
+				[zfs dmu_buf_will_fill requires boolean arg])
+		])
+		dnl #
 		dnl # ZFS 2.X check for direct IO interfaces.
 		dnl #
 		LB_CHECK_COMPILE([if ZFS has direct IO interfaces],

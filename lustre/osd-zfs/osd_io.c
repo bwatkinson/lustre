@@ -296,7 +296,11 @@ static ssize_t osd_write_llog_header(struct osd_object *obj,
 		bufoff = offset - db->db_offset;
 		tocpy = MIN(db->db_size - bufoff, len);
 		if (tocpy == db->db_size)
+#ifdef HAVE_DMU_BUF_WILL_FILL_3ARG
+			dmu_buf_will_fill(db, oh->ot_tx, B_FALSE);
+#else
 			dmu_buf_will_fill(db, oh->ot_tx);
+#endif
 		else
 			dmu_buf_will_dirty(db, oh->ot_tx);
 		LASSERT(offset >= db->db_offset);
@@ -304,7 +308,11 @@ static ssize_t osd_write_llog_header(struct osd_object *obj,
 		(void) memcpy((char *)db->db_data + bufoff, data, tocpy);
 
 		if (tocpy == db->db_size)
+#ifdef HAVE_DMU_BUF_WILL_FILL_3ARG
+			dmu_buf_fill_done(db, oh->ot_tx, B_FALSE);
+#else
 			dmu_buf_fill_done(db, oh->ot_tx);
+#endif
 
 		offset += tocpy;
 		data += tocpy;
