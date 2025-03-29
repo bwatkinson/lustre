@@ -759,6 +759,18 @@ static void osd_key_fini(const struct lu_context *ctx,
 	struct osd_thread_info *info = data;
 	struct osd_idmap_cache *idc = info->oti_ins_cache;
 
+	if (info->oti_dio_pages) {
+		LASSERTF(oti->oti_dio_pages_used == 0, "%d\n", oti->oti_dio_pages_used);
+		int i;
+		for (i = 0; i < OSD_MAX_DIO_PAGES; i++) {
+			struct page *page = info->oti_dio_pages[i];
+			if (page) {
+				__free_page(page);
+			}
+		}
+		OBD_FREE_PTR_ARRAY_LARGE(oti->oti_dio_pages, OSD_MAX_DIO_PAGES);
+	}
+
 	if (idc != NULL) {
 		LASSERT(info->oti_ins_cache_size > 0);
 		OBD_FREE_PTR_ARRAY_LARGE(idc, info->oti_ins_cache_size);

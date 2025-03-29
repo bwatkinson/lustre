@@ -404,9 +404,6 @@ static int osd_bufs_put(const struct lu_env *env, struct dt_object *dt,
 					dmu_return_arcbuf(lnb[i].lnb_data);
 					atomic_dec(&osd->od_zerocopy_loan);
 				}
-			} else {
-				__free_page(lnb[i].lnb_page);
-				oti->oti_dio_pages_used--;
 			}
 		}
 		lnb[i].lnb_page = NULL;
