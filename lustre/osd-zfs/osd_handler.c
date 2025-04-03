@@ -762,13 +762,13 @@ static void osd_key_fini(const struct lu_context *ctx,
 	if (info->oti_dio_pages) {
 		LASSERTF(oti->oti_dio_pages_used == 0, "%d\n", oti->oti_dio_pages_used);
 		int i;
-		for (i = 0; i < OSD_MAX_DIO_PAGES; i++) {
+		for (i = 0; i < PTLRPC_MAX_BRW_PAGES; i++) {
 			struct page *page = info->oti_dio_pages[i];
 			if (page) {
 				__free_page(page);
 			}
 		}
-		OBD_FREE_PTR_ARRAY_LARGE(oti->oti_dio_pages, OSD_MAX_DIO_PAGES);
+		OBD_FREE_PTR_ARRAY_LARGE(oti->oti_dio_pages, PTLRPC_MAX_BRW_PAGES);
 	}
 
 	if (idc != NULL) {

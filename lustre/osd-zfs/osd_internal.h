@@ -276,6 +276,9 @@ struct osd_thread_info {
 
 	struct page	       **oti_dio_pages;
 	int		       oti_dio_pages_used;
+
+	abd_t 			dio_abd;
+	boolean_t		is_dio;
 };
 
 extern struct lu_context_key osd_key;
